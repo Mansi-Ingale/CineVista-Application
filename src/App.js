@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "./Components/Navbar";
 import Main from "./Components/Main";
 import Logo from "./Components/Logo";
@@ -9,6 +9,9 @@ import Box from "./Components/Box";
 import MovieList from "./Components/MovieList";
 import Summary from "./Components/Summary";
 import WatchedMovies from "./Components/WatchedMovie";
+import Loader from "./Components/Loader";
+import ErrorMessage from "./Components/ErrorMessage";
+import MovieDetails from "./Components/MovieDetails";
 
 const tempWatchedData = [
   {
@@ -57,35 +60,121 @@ const tempMovieData = [
   },
 ];
 
+const KEY = "ef1768c8";
+
 export default function App() {
-  const [movies, setMovies] = useState(tempMovieData);
-  const [watched, setWatched] = useState(tempWatchedData);
+  const [query, setQuery] = useState("");
+  const [movies, setMovies] = useState([]);
+  const [watched, setWatched] = useState([]);
+  //loading state symbol
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [selectedId, setSelectedId] = useState(null);
+
+  function handleSelectedMovie(id) {
+    setSelectedId((selectedId) => (id === selectedId ? null : id));
+  }
+
+  function handleCloseMovie() {
+    setSelectedId(null);
+  }
+
+  function handleAddWatchedMovie(movie) {
+    setWatched(() => [...watched, movie]);
+  }
+
+  function handleDeleteWatched(id) {
+    setWatched((watched) => watched.filter((movie) => movie.imdbID !== id));
+  }
+
+
+
+  useEffect(
+    function () {
+      const controller = new AbortController();
+
+      async function fetchMovies() {
+        try {
+          setIsLoading(true);
+          setError("");
+
+          const res = await fetch(
+            `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
+            { signal: controller.signal }
+          );
+
+          if (!res.ok) {
+            throw new Error("Something went wrong while fetching the data!!");
+          }
+
+          const data = await res.json();
+          if (data.Response === "False") {
+            throw new Error("Movie not found");
+          }
+
+          setMovies(data.Search);
+          setError("")
+          // console.log(data.Search);
+        } catch (err) {
+          if (err.name !== "AbortError") {
+            setError(err.message);
+          }
+        } finally {
+          setIsLoading(false);
+        }
+      }
+
+      if (query.length < 3) {
+        setMovies([]);
+        setError("");
+        return;
+      }
+
+      handleCloseMovie();
+      fetchMovies();
+
+      return function () {
+        controller.abort();
+      };
+    },
+    [query]
+  );
+
   return (
     <>
       <Navbar>
         <Logo />
-        <Search />
+        <Search query={query} setQuery={setQuery} />
         <NumResults movies={movies} />
       </Navbar>
 
       <Main>
-        {/* <Box element={<MovieList movies={movies} />} />
-        <Box
-          element={
-            <>
-              <Summary watched={watched} />
-              <WatchedMovies watched={watched} />
-            </>
-          }
-        /> */}
-
         <Box>
-          <MovieList movies={movies} />
+          {/* {isLoading ? <Loader /> : <MovieList movies={movies} />} */}
+          {isLoading && <Loader />}
+          {!isLoading && !error && (
+            <MovieList movies={movies} onSelectMovie={handleSelectedMovie} />
+          )}
+          {error && <ErrorMessage message={error} />}
         </Box>
 
         <Box>
-          <Summary watched={watched} />
-          <WatchedMovies watched={watched} />
+          {selectedId ? (
+            <MovieDetails
+              selectedId={selectedId}
+              onCloseMovie={handleCloseMovie}
+              onAddWatchedMovie={handleAddWatchedMovie}
+              watched={watched}
+            />
+          ) : (
+            <>
+              <Summary watched={watched} />
+              <WatchedMovies
+                watched={watched}
+                onDeleteWatched={handleDeleteWatched}
+              />
+            </>
+          )}
         </Box>
 
         {/* <WatchedBox /> */}
