@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import StarRatings from "./StarRatings";
 import Loader from "./Loader";
+import { useKey } from "./useKey";
 
 const KEY = "ef1768c8";
 
@@ -13,6 +14,13 @@ function MovieDetails({
   const [movie, setMovie] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [userRating, setUserRating] = useState("");
+
+  const countRef = useRef(0);
+
+  useEffect(function(){
+     if(userRating)countRef.current = countRef.current + 1;
+  },[userRating])
+
   const isWatched = watched.map((movie) => movie.imdbID).includes(selectedId);
   const watchedUserRating = watched.find(
     (movie) => movie.imdbID === selectedId
@@ -40,6 +48,7 @@ function MovieDetails({
       imdbRating: Number(imdbRating),
       runtime: Number(runtime.split(" ").at(0)),
       userRating,
+      countRatingDecisions: countRef.current
     };
 
     onAddWatchedMovie(newWatchedMovie);
@@ -48,25 +57,7 @@ function MovieDetails({
   // console.log(title, year);
 
   //allow user to press ESC key and go back from opened movie
-  useEffect(
-    function () {
-
-      function callback(e){
-        if (e.code === "Escape") {
-          onCloseMovie();
-          // console.log("esc is encountered");
-        }
-      }
-
-      document.addEventListener("keydown", callback);
-
-      //close function
-      return function () {
-        document.removeEventListener("keydown", callback);
-      };
-    },
-    [onCloseMovie]
-  );
+  useKey("Escape", onCloseMovie);
 
   useEffect(
     function () {
